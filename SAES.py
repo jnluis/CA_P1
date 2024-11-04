@@ -1,4 +1,6 @@
 from array import array
+from hashlib import sha256
+from collections import Counter
 
 block_size = 16
 key_size = 16
@@ -8,15 +10,17 @@ def new(key, skey=None):
     if skey is None:
         return ECBMode(AES(key))
     else:
-        return None
+        return ECBMode(AES(key, skey))
 
 
 #### AES cipher implementation
 class AES(object):
     block_size = 16
 
-    def __init__(self, key):
+    def __init__(self, key, skey=None):
         self.setkey(key)
+        self.setshufflekey(skey)
+        self.expand_key()
 
     def setkey(self, key):
         """Sets the key and performs key expansion."""
@@ -25,7 +29,143 @@ class AES(object):
         self.key_size = len(key)
         self.rounds = 10
 
-        self.expand_key()
+    def setshufflekey(self, skey):
+        """Sets the shuffle key and performs key expansion."""
+
+        if skey is None:
+            self.skey = None
+            self.permutation_indices = None
+            self.round_key_order = None
+            self.modified_round_number = None
+            return None
+
+        self.skey = skey
+        self.skey_size = len(skey)
+
+        self.permutation_skey = skey.encode()[:16:2]
+        self.modified_round_skey = skey.encode()[1:16:2]
+
+        self.permutation_indices = self.generate_bytes_permutation_indices(self.permutation_skey)
+        self.round_key_order = self.round_key_order_permutation(self.permutation_skey)
+        self.modified_round_number = self.select_modified_round_number(self.skey.encode())
+        self.saes_sbox = self.create_saes_sbox(self.modified_round_skey)
+        self.saes_inv_sbox = self.create_inverse_sbox()
+    
+
+
+    def generate_bytes_permutation_indices(self, skey):
+        """Generates a list of deterministic permutation indices for round keys."""
+        num_round_keys = self.rounds + 1  # Total rounds + final key
+        permutation_indices = []
+
+        for round_idx in range(num_round_keys):
+            # Hash the skey with the round index for deterministic bytes
+            hash_input = skey + round_idx.to_bytes(1, 'big')
+            hash_output = sha256(hash_input).digest()
+
+            # Use the hash output to generate a permutation for this round key
+            indices = list(range(16))
+            for i in range(15, 0, -1):
+                swap_idx = hash_output[i] % (i + 1)
+                indices[i], indices[swap_idx] = indices[swap_idx], indices[i]
+
+            permutation_indices.append(indices)
+
+        return permutation_indices
+    
+    def round_key_order_permutation(self, skey):
+        """Generates a deterministic permutation of round key order based on SK."""
+        num_round_keys = self.rounds + 1  # Total rounds + final key
+        order_indices = list(range(num_round_keys))
+
+        # Generate pseudo-random bytes for shuffling
+        hash_output = sha256(skey).digest()
+        for i in range(num_round_keys - 1, 0, -1):
+            swap_idx = hash_output[i % len(hash_output)] % (i + 1)
+            order_indices[i], order_indices[swap_idx] = order_indices[swap_idx], order_indices[i]
+
+        return order_indices
+    
+
+    def select_modified_round_number(self, skey):
+        # Create a hash of the secret key
+        hashed_key = sha256(skey).hexdigest()  # Using SHA-256
+
+        # Convert the hash to an integer
+        hash_value = int(hashed_key, 16)  # Convert hex to integer
+
+        # Generate a round number based on the hash value
+        round_number = hash_value % (self.rounds - 1)  # Can't be on last round
+        
+        print(round_number)
+        return round_number
+
+    
+    def create_saes_sbox(self, modified_round_skey):
+        """
+        Creates a shuffled S-Box based on the provided secret key (skey).
+        :param skey: The secret key used for creating the S-Box.
+        :return: A shuffled S-Box.
+        """
+        def generate_shuffled_sbox():
+            # Initial SHA-256 hash of the key
+            hashed_key = sha256(modified_round_skey).digest()
+
+
+            # Create a list of indices [0, 1, ..., 255]
+            indices = list(range(256))
+            
+            # Use the hash to shuffle the indices
+            for i in range(len(indices)):
+                # The current byte from the hash to modify the index
+                byte = hashed_key[i % len(hashed_key)]
+                
+                # Calculate the new position for this index
+                swap_index = (i + byte) % 256
+                
+                # Swap the current index with the calculated index
+                indices[i], indices[swap_index] = indices[swap_index], indices[i]
+            
+            # Create a shuffled S-Box using the shuffled indices
+            shuffled_sbox = [aes_sbox[index] for index in indices]
+            return shuffled_sbox
+
+        def validate_and_shuffle(sbox):
+            # Ensure at least 50% of the S-Box bytes have changed their position
+            changed_positions = set()
+            for i in range(256):
+                if sbox[i] != aes_sbox[i]:
+                    changed_positions.add(i)
+
+            # If less than 50% have changed, recursively shuffle again
+            if len(changed_positions) < 128:  # Less than half
+                return self.create_saes_sbox(modified_round_skey)  # Recurse with the same key
+            return sbox
+
+        shuffled_sbox = generate_shuffled_sbox()
+        return array('B', shuffled_sbox)
+
+        
+    def create_inverse_sbox(self):
+        """
+        Calculate the inverse S-box from the given S-box.
+        The inverse S-box maps each substituted value back to its original value.
+
+        Args:
+            sbox (array): Original S-box array
+
+        Returns:
+            array: Inverse S-box array
+        """
+        # Create an empty inverse s-box of the same size (256 bytes)
+        saes_inv_sbox = array('B', [0] * 256)
+
+        # For each position and value in the original s-box
+        for position in range(256):
+            value = self.saes_sbox[position]
+            # In the inverse s-box, map the value back to its position
+            saes_inv_sbox[value] = position
+        return saes_inv_sbox
 
     def expand_key(self):
         """Performs AES key expansion on self.key and stores in self.exkey"""
@@ -37,8 +177,10 @@ class AES(object):
         # Here's a description of AES key schedule:
         # http://en.wikipedia.org/wiki/Rijndael_key_schedule
 
+        key = self.key.encode()
+
         # The expanded key starts with the actual key itself
-        exkey = array('B', self.key.encode())
+        exkey = array('B', key)
 
         # 4-byte temporary variable for key expansion
         word = exkey[-4:]
@@ -66,8 +208,29 @@ class AES(object):
             # Last key expansion cycle always finishes here
             if len(exkey) >= (self.rounds + 1) * self.block_size:
                 break
+        
+        
+        # Shuffle round keys if `self.permutation_indices` is set
+        if self.permutation_indices:
+            for round_idx in range(self.rounds + 1):
+                start = round_idx * 16
+                end = start + 16
+                round_key = exkey[start:end]
+                permuted_round_key = array('B', [round_key[i] for i in self.permutation_indices[round_idx]])
+                exkey[start:end] = permuted_round_key
 
-        self.exkey = exkey
+        # If round key order shuffling is set, reorder the round keys
+        if self.round_key_order:
+            shuffled_exkey = array('B')
+            for round_idx in self.round_key_order:
+                start = round_idx * 16
+                end = start + 16
+                shuffled_exkey.extend(exkey[start:end])
+            self.exkey = shuffled_exkey
+        else:
+            self.exkey = exkey
+            
+
 
     def add_round_key(self, block, round):
         """AddRoundKey step. This is where the key is mixed into plaintext"""
@@ -78,7 +241,10 @@ class AES(object):
         for i in range(16):
             block[i] ^= exkey[offset + i]
 
-        #print 'AddRoundKey:', block
+        if round == self.modified_round_number:
+            for i in range(16):
+                block[i] ^= self.modified_round_skey[i % 8]
+
 
     def sub_bytes(self, block, sbox):
         """
@@ -173,7 +339,10 @@ class AES(object):
         self.add_round_key(block, 0)
 
         for round in range(1, self.rounds):
-            self.sub_bytes(block, aes_sbox)
+            if round != self.modified_round_number:
+                self.sub_bytes(block, aes_sbox)
+            else:
+                self.sub_bytes(block, self.saes_sbox)
             self.shift_rows(block)
             self.mix_columns(block)
             self.add_round_key(block, round)
@@ -193,7 +362,10 @@ class AES(object):
         # count rounds down from (self.rounds) ... 1
         for round in range(self.rounds - 1, 0, -1):
             self.shift_rows_inv(block)
-            self.sub_bytes(block, aes_inv_sbox)
+            if round != self.modified_round_number - 1:
+                self.sub_bytes(block, aes_inv_sbox)
+            else:
+                self.sub_bytes(block, self.saes_inv_sbox)
             self.add_round_key(block, round)
             self.mix_columns_inv(block)
 
@@ -240,8 +412,14 @@ class ECBMode(object):
 
     def decrypt(self, data):
         """Decrypt data in ECB mode"""
+        data = self.ecb(data, self.cipher.decrypt_block)
 
-        return self.ecb(data, self.cipher.decrypt_block).decode()
+        try:
+            return data.decode('utf-8')  # Attempt to decode as UTF-8
+        except UnicodeDecodeError:
+            # If decoding fails, return the raw byte data or a placeholder
+            print("Warning: Decrypted data is not valid UTF-8. Returning raw bytes.")
+            return data  # or you could return some error message or empty string
 
 
 def galois_multiply(a, b):
