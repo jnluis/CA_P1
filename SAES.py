@@ -39,15 +39,15 @@ class AES(object):
             self.modified_round_number = None
             return None
 
-        self.skey = skey# if isinstance(skey, bytes) else skey.encode()
+        self.skey = skey if isinstance(skey, bytes) else skey.encode()
         self.skey_size = len(skey)
 
-        self.permutation_skey = skey.encode()[:16:2]
-        self.modified_round_skey = skey.encode()[1:16:2]
+        self.permutation_skey = self.skey[:16:2]
+        self.modified_round_skey = self.skey[1:16:2]
 
         self.permutation_indices = self.generate_bytes_permutation_indices(self.permutation_skey)
         self.round_key_order = self.round_key_order_permutation(self.permutation_skey)
-        self.modified_round_number = self.select_modified_round_number(self.skey.encode())
+        self.modified_round_number = self.select_modified_round_number(self.skey)
         self.saes_sbox = self.create_saes_sbox(self.modified_round_skey)
         self.saes_inv_sbox = self.create_saes_inverse_sbox()
     
