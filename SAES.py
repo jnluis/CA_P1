@@ -1,7 +1,6 @@
 from array import array
 from hashlib import sha256
 from collections import Counter
-import sys
 
 block_size = 16
 key_size = 16
@@ -96,9 +95,8 @@ class AES(object):
         hash_value = int(hashed_key, 16)  # Convert hex to integer
 
         # Generate a round number based on the hash value
-        round_number = hash_value % (self.rounds - 1)  # Can't be on last round
+        round_number = (hash_value % (self.rounds - 1)) + 1  # Can't be on last round
         
-        print(round_number)
         return round_number
 
     
@@ -340,7 +338,7 @@ class AES(object):
         self.add_round_key(block, 0)
 
         for round in range(1, self.rounds):
-            if round != self.modified_round_number:
+            if self.modified_round_number is None or round != self.modified_round_number:
                 self.sub_bytes(block, aes_sbox)
             else:
                 self.sub_bytes(block, self.saes_sbox)
@@ -356,9 +354,6 @@ class AES(object):
     def decrypt_block(self, block):
         """Decrypts a single block. This is the main AES decryption function"""
 
-        if self.modified_round_number is None:
-            sys.exit("modified_round_number is not set. Are you trying to decrypt S-AES with normal AES?")
-
         # For efficiency reasons, the state between steps is transmitted via a
         # mutable array, not returned
         self.add_round_key(block, self.rounds)
@@ -366,7 +361,7 @@ class AES(object):
         # count rounds down from (self.rounds) ... 1
         for round in range(self.rounds - 1, 0, -1):
             self.shift_rows_inv(block)
-            if round != self.modified_round_number - 1:
+            if self.modified_round_number is None or round != self.modified_round_number - 1:
                 self.sub_bytes(block, aes_inv_sbox)
             else:
                 self.sub_bytes(block, self.saes_inv_sbox)
@@ -374,7 +369,10 @@ class AES(object):
             self.mix_columns_inv(block)
 
         self.shift_rows_inv(block)
-        self.sub_bytes(block, aes_inv_sbox)
+        if self.modified_round_number is None or 0 != self.modified_round_number - 1:
+            self.sub_bytes(block, aes_inv_sbox)
+        else:
+            self.sub_bytes(block, self.saes_inv_sbox)
         self.add_round_key(block, 0)
         # no mix_columns step in the last round
 
