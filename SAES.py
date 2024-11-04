@@ -1,6 +1,7 @@
 from array import array
 from hashlib import sha256
 from collections import Counter
+import sys
 
 block_size = 16
 key_size = 16
@@ -355,6 +356,9 @@ class AES(object):
     def decrypt_block(self, block):
         """Decrypts a single block. This is the main AES decryption function"""
 
+        if self.modified_round_number is None:
+            sys.exit("modified_round_number is not set. Are you trying to decrypt S-AES with normal AES?")
+
         # For efficiency reasons, the state between steps is transmitted via a
         # mutable array, not returned
         self.add_round_key(block, self.rounds)
@@ -390,7 +394,7 @@ class ECBMode(object):
 
     def ecb(self, data:str, block_func):
         """Perform ECB mode with the given function"""
-
+        
         if len(data) % self.block_size != 0:
             raise ValueError("Input length must be multiple of 16")
 
