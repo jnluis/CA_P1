@@ -49,7 +49,7 @@ class AES(object):
         self.round_key_order = self.round_key_order_permutation(self.permutation_skey)
         self.modified_round_number = self.select_modified_round_number(self.skey.encode())
         self.saes_sbox = self.create_saes_sbox(self.modified_round_skey)
-        self.saes_inv_sbox = self.create_inverse_sbox()
+        self.saes_inv_sbox = self.create_saes_inverse_sbox()
     
 
 
@@ -135,17 +135,17 @@ class AES(object):
             for i in range(256):
                 if sbox[i] != aes_sbox[i]:
                     changed_positions.add(i)
-
+    
             # If less than 50% have changed, recursively shuffle again
             if len(changed_positions) < 128:  # Less than half
                 return self.create_saes_sbox(modified_round_skey)  # Recurse with the same key
             return sbox
 
         shuffled_sbox = generate_shuffled_sbox()
-        return array('B', shuffled_sbox)
+        return array('B', validate_and_shuffle(shuffled_sbox))
 
         
-    def create_inverse_sbox(self):
+    def create_saes_inverse_sbox(self):
         """
         Calculate the inverse S-box from the given S-box.
         The inverse S-box maps each substituted value back to its original value.
@@ -409,7 +409,9 @@ class ECBMode(object):
     def encrypt(self, data):
         """Encrypt data in ECB mode"""
         
-        data = data.encode()
+        #data = data.encode()
+        data = add_pkcs7_padding(data.encode())
+
         return self.ecb(data, self.cipher.encrypt_block)
 
     def decrypt(self, data):
@@ -417,12 +419,26 @@ class ECBMode(object):
         data = self.ecb(data, self.cipher.decrypt_block)
 
         try:
-            return data.decode('utf-8')  # Attempt to decode as UTF-8
+            return remove_pkcs7_padding(data.decode('utf-8'))  # Attempt to decode as UTF-8
         except UnicodeDecodeError:
             # If decoding fails, return the raw byte data or a placeholder
             print("Warning: Decrypted data is not valid UTF-8. Returning raw bytes.")
             return data  # or you could return some error message or empty string
 
+def add_pkcs7_padding(plain):
+    """
+    Adds PKCS7 padding to given bytes.
+    """
+
+    padding_len = 16 - (len(plain) % 16)
+    return plain + bytes([padding_len] * padding_len)
+
+def remove_pkcs7_padding(plain_with_padding):
+    """
+    Removes PKCS7 padding from given bytes.
+    """
+
+    return plain_with_padding[:len(plain_with_padding)-ord(plain_with_padding[-1])]
 
 def galois_multiply(a, b):
     """Galois Field multiplicaiton for AES"""

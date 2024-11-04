@@ -1,6 +1,7 @@
-from SAES import SAES
+import SAES
 import sys
 import base64
+from hashlib import pbkdf2_hmac
 
 def main():
     """
@@ -9,13 +10,17 @@ def main():
     The content to be encrypted is provided through standard input (stdin), and the ciphertext is returned through standard output (stdout).
     """
         
-    if len(sys.argv) < 2:
+    if 2 > len(sys.argv) > 3:
         print("Usage: python3 encrypt.py <AES_Key> [SAES_Key]")
         sys.exit(1)
     
-    AES_key = sys.argv[1]
-    SAES_key = sys.argv[2] if len(sys.argv) > 2 else None
+    AES_password = sys.argv[1]
+    SAES_password = sys.argv[2] if len(sys.argv) > 2 else None
     plaintext = sys.stdin.read()
+
+    AES_key  = pbkdf2_hmac('sha256', AES_password.encode('utf-8'), salt=b'salt', iterations=10000, dklen=16).hex()
+    SAES_key = pbkdf2_hmac('sha256', SAES_password.encode('utf-8'), salt=b'salt', iterations=10000, dklen=16).hex() if SAES_password else None
+
 
     cryptor= SAES.new(AES_key, SAES_key)
     ciphertext = cryptor.encrypt(plaintext)

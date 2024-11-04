@@ -1,6 +1,7 @@
-from SAES import SAES
+import SAES
 import sys
 import base64
+from hashlib import pbkdf2_hmac
 
 def main():
     """
@@ -8,13 +9,16 @@ def main():
     It accepts two text-based arguments as inputs: a normal AES key and an optional shuffle key (SK).
     The content to be decrypted is provided through standard input (stdin), and the plaintext is returned through standard output (stdout).
     """    
-    if len(sys.argv) < 2:
+    if 2 > len(sys.argv) > 3:
         print("Usage: python3 decrypt.py <AES_Key> [SAES_Key]")
         sys.exit(1)
     
-    AES_key = sys.argv[1]
-    SAES_key = sys.argv[2] if len(sys.argv) > 2 else None
+    AES_password = sys.argv[1]
+    SAES_password = sys.argv[2] if len(sys.argv) > 2 else None
     ciphertext = base64.b64decode(sys.stdin.read().strip())
+
+    AES_key  = pbkdf2_hmac('sha256', AES_password.encode('utf-8'), salt=b'salt', iterations=10000, dklen=16).hex()
+    SAES_key = pbkdf2_hmac('sha256', SAES_password.encode('utf-8'), salt=b'salt', iterations=10000, dklen=16).hex() if SAES_password else None
 
     decryptor= SAES.new(AES_key, SAES_key)
 
