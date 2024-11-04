@@ -23,11 +23,13 @@ def main():
     plain = sys.stdin.read().strip()
 
     AES_key  = pbkdf2_hmac('sha256', AES_password.encode('utf-8'), salt=b'salt', iterations=10000, dklen=16)
+    print(AES_key)
+    # AES_key = AES_password.encode()
 
     # Create padder
     padder = padding.PKCS7(128).padder()
 
-    plaintext_bytes = plain.encode('ascii')
+    plaintext_bytes = plain.encode()
     padded_data = padder.update(plaintext_bytes) + padder.finalize()
 
     # Initialize cipher

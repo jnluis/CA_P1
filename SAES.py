@@ -22,14 +22,14 @@ class AES(object):
         self.setshufflekey(skey)
         self.expand_key()
 
-    def setkey(self, key):
+    def setkey(self, key: bytes | str):
         """Sets the key and performs key expansion."""
 
-        self.key = key
+        self.key: bytes = key if isinstance(key, bytes) else key.encode()
         self.key_size = len(key)
         self.rounds = 10
 
-    def setshufflekey(self, skey):
+    def setshufflekey(self, skey: bytes | str | None):
         """Sets the shuffle key and performs key expansion."""
 
         if skey is None:
@@ -39,7 +39,7 @@ class AES(object):
             self.modified_round_number = None
             return None
 
-        self.skey = skey
+        self.skey = skey# if isinstance(skey, bytes) else skey.encode()
         self.skey_size = len(skey)
 
         self.permutation_skey = skey.encode()[:16:2]
@@ -176,7 +176,7 @@ class AES(object):
         # Here's a description of AES key schedule:
         # http://en.wikipedia.org/wiki/Rijndael_key_schedule
 
-        key = self.key.encode()
+        key = self.key
 
         # The expanded key starts with the actual key itself
         exkey = array('B', key)

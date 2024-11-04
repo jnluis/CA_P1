@@ -18,8 +18,10 @@ def main():
     SAES_password = sys.argv[2] if len(sys.argv) > 2 else None
     plaintext = sys.stdin.read()
 
-    AES_key  = pbkdf2_hmac('sha256', AES_password.encode('utf-8'), salt=b'salt', iterations=10000, dklen=16).hex()
-    SAES_key = pbkdf2_hmac('sha256', SAES_password.encode('utf-8'), salt=b'salt', iterations=10000, dklen=16).hex() if SAES_password else None
+    AES_key  = pbkdf2_hmac('sha256', AES_password.encode('utf-8'), salt=b'salt', iterations=10000, dklen=16)
+    SAES_key = pbkdf2_hmac('sha256', SAES_password.encode('utf-8'), salt=b'salt', iterations=10000, dklen=16) if SAES_password else None
+    # AES_key = AES_password
+    # SAES_key = SAES_password if SAES_password else None
 
 
     cryptor= SAES.new(AES_key, SAES_key)
