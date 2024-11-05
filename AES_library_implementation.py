@@ -2,8 +2,6 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import padding
 import sys
-import binascii
-import hashlib
 import time
 import sys
 from hashlib import pbkdf2_hmac
@@ -30,7 +28,7 @@ def main():
     padder = padding.PKCS7(128).padder()
 
     plaintext_bytes = plain.encode()
-    padded_data = padder.update(plaintext_bytes) + padder.finalize()
+    
 
     # Initialize cipher
     cipher = Cipher(algorithms.AES(AES_key), modes.ECB(),backend=default_backend())
@@ -38,35 +36,29 @@ def main():
     # Initialize encryptor
     encryptor = cipher.encryptor()
 
-    #start = time.time_ns()
-
-    # Perform encryption
+    start_time = time.time_ns()
+    padded_data = padder.update(plaintext_bytes) + padder.finalize()
     ciphertext = encryptor.update(padded_data) + encryptor.finalize()
+    end_time = time.time_ns()
 
-    #end = time.time_ns()
-
-    #time_file_enc = open(f'times/aes-crypto_encrypt_times.txt', 'a')
-    #overall = (end - start) / (10 ** 9)
-    #time_file_enc.write(str('{:0.9f}\n'.format(overall)))
+    time_file_enc = open(f'time/Cryptography_encrypt_times.txt', 'a')
+    overall = (end_time - start_time) / (10 ** 9)
+    time_file_enc.write(str('{:0.9f}\n'.format(overall)))
 
     # Initialize decryptor
     decryptor = cipher.decryptor()
 
-    padded_decrypted = decryptor.update(ciphertext) + decryptor.finalize()
-
-    #start = time.time_ns()
-
     # Create unpadder
     unpadder = padding.PKCS7(128).unpadder()
 
-    # Perform decryption
+    start_time = time.time_ns()
+    padded_decrypted = decryptor.update(ciphertext) + decryptor.finalize()
     plain_decrypted = unpadder.update(padded_decrypted) + unpadder.finalize()
+    end_time = time.time_ns()
 
-    #end = time.time_ns()
-
-    #time_file_dec = open(f'times/aes-crypto_decrypt_times.txt', 'a')
-    #overall = (end - start) / (10 ** 9)
-    #time_file_dec.write(str('{:0.9f}\n'.format(overall)))
+    time_file_dec = open(f'time/Cryptography_decrypt_times.txt', 'a')
+    overall = (end_time - start_time) / (10 ** 9)
+    time_file_dec.write(str('{:0.9f}\n'.format(overall)))
 
     print(base64.b64encode(ciphertext).decode())  # Print ciphertext as hex
     print(plain_decrypted.decode())

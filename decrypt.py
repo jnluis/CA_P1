@@ -2,6 +2,7 @@ import SAES
 import sys
 import base64
 from hashlib import pbkdf2_hmac
+import time
 
 def main():
     """
@@ -21,8 +22,14 @@ def main():
     SAES_key = pbkdf2_hmac('sha256', SAES_password.encode('utf-8'), salt=b'salt', iterations=10000, dklen=16) if SAES_password else None
 
     decryptor= SAES.new(AES_key, SAES_key)
+    start_time = time.time_ns()
+    plaintext= decryptor.decrypt(ciphertext)
+    end_time = time.time_ns()
 
-    print(decryptor.decrypt(ciphertext))
+    time_file = open(f'time/{"saes" if SAES_key else "aes"}_decrypt_times.txt', 'a')
+    overall = (end_time - start_time) / (10 ** 9)
+    time_file.write(str('{:0.9f}\n'.format(overall)))
+    print(plaintext)
 
 if __name__ == "__main__":
     main()
