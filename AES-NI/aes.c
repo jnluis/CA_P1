@@ -3,6 +3,11 @@ A function with OpenSSL interface (using AES_KEY struct), to call the other key-
 length specific key expansion functions
 */
 #include <wmmintrin.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <openssl/sha.h>
+#include <stdio.h>
 #if !defined(ALIGN16)
 #if defined(__GNUC__)
 #define ALIGN16 __attribute__((aligned(16)))
@@ -10,6 +15,8 @@ length specific key expansion functions
 #define ALIGN16 __declspec(align(16))
 #endif
 #endif
+#define AES_128_KEY_SCHEDULES 11
+#define AES_NUMBER_OF_ROUNDS 10
 typedef struct KEY_SCHEDULE
 {
     ALIGN16 unsigned char KEY[16 * 15];
@@ -66,4 +73,102 @@ int AES_set_decrypt_key(const unsigned char *userKey,
     }
     Key_Schedule[0] = Temp_Key_Schedule[nr];
     return 0;
+}
+
+int SAES_set_shuffle_key(const unsigned char *userKey,
+                        const int bits, uint8_t *PERMUTATION_SKEY, uint8_t *MODIFIED_ROUND_SKEY)
+{
+    if (!userKey)
+        return -1;
+    if (bits == 128)
+    {
+        int p_idx = 0;
+        int m_idx = 0; 
+        
+        for (int i = 0; i < 16; i++)
+        {
+            if(i%2==0){
+                PERMUTATION_SKEY[p_idx++] = userKey[i];
+            }
+            else{
+                MODIFIED_ROUND_SKEY[m_idx++] = userKey[i];
+            }
+        }
+
+        return 0;
+    }
+    return -2;
+}
+
+void SAES_generate_bytes_permutation_indices(uint8_t permutation_indices[11][16], uint8_t *permutation_key) {
+    for (int round_idx = 0; round_idx < AES_128_KEY_SCHEDULES; round_idx++) {
+        // Hash the permutation_key with the round index for deterministic bytes
+        uint8_t uint8_hash_input[9];
+        memcpy(uint8_hash_input, permutation_key, 8);
+        uint8_hash_input[8] = (uint8_t)round_idx;
+
+        unsigned char hash_input[9];
+        unsigned char hash_output[SHA256_DIGEST_LENGTH];
+        
+        memcpy(hash_input, uint8_hash_input, 9);
+
+        SHA256(hash_input, sizeof(hash_input), hash_output);
+
+        // Use the hash output to generate a permutation for this round key
+        uint8_t indices[16];
+        for (int i = 0; i < 16; i++) {
+            indices[i] = i;
+        }
+        for (int i = 15; i > 0; i--) {
+            int swap_idx = ((uint8_t)(hash_output[i])) % (i + 1);
+            uint8_t temp = indices[i];
+            indices[i] = indices[swap_idx];
+            indices[swap_idx] = temp;
+        }
+
+        memcpy(permutation_indices[round_idx], indices, sizeof(uint8_t) * 16);
+    }
+}
+
+void SAES_round_key_order_permutation(uint8_t order_indices[11], uint8_t *permutation_key) { 
+
+    unsigned char hash_input[8];
+    memcpy(hash_input, permutation_key, 8);
+
+    // Generate pseudo-random bytes for shuffling
+    uint8_t hash_output[SHA256_DIGEST_LENGTH];
+    SHA256(hash_input, sizeof(hash_input), hash_output);
+    
+    for (int i = 0; i < AES_128_KEY_SCHEDULES; i++) {
+        order_indices[i] = i;
+    }
+
+    for (int i = AES_128_KEY_SCHEDULES - 1; i > 0; i--) {
+        int swap_idx = ((uint8_t)(hash_output[i % SHA256_DIGEST_LENGTH])) % (i + 1);
+        uint8_t temp = order_indices[i];
+        order_indices[i] = order_indices[swap_idx];
+        order_indices[swap_idx] = temp;
+    }
+}
+
+uint8_t SAES_select_modified_round_number(uint8_t *skey) {
+    
+    unsigned char hash_input[16];
+    memcpy(hash_input, skey, 16);
+
+    // Create a hash of the secret key
+    unsigned char hash_output[SHA256_DIGEST_LENGTH];
+
+    SHA256(hash_input, sizeof(hash_input), hash_output);
+
+    unsigned long long hash_value = 0;
+    // Combine the first few bytes of the hash into an integer
+    for (int i = 0; i < sizeof(hash_value) && i < SHA256_DIGEST_LENGTH; ++i) {
+        hash_value = (hash_value << 8) | hash_output[i];  // Shift left and add next byte
+    }
+    printf("Hash value: %lld\n", hash_value);
+
+    // Generate a round number based on the hash value
+    uint8_t round_number = (hash_value % (AES_NUMBER_OF_ROUNDS - 1)) + 1;  // Can't be on the last round
+    return round_number;
 }
