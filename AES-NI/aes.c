@@ -25,13 +25,16 @@ typedef struct KEY_SCHEDULE
 } AES_KEY;
 int AES_set_encrypt_key(const unsigned char *userKey,
                         const int bits,
-                        AES_KEY *key)
+                        AES_KEY *key,
+                        uint8_t *PERMUTATION_SKEY, 
+                        uint8_t *MODIFIED_ROUND_SKEY)
 {
     if (!userKey || !key)
         return -1;
     if (bits == 128)
     {
         AES_128_Key_Expansion(userKey, key);
+        permute_key(key, AES_NUMBER_OF_ROUNDS, PERMUTATION_SKEY);
         key->nr = 10;
         return 0;
     }
@@ -39,7 +42,9 @@ int AES_set_encrypt_key(const unsigned char *userKey,
 }
 int AES_set_decrypt_key(const unsigned char *userKey,
                         const int bits,
-                        AES_KEY *key)
+                        AES_KEY *key,
+                        uint8_t *PERMUTATION_SKEY,
+                        uint8_t *MODIFIED_ROUND_SKEY)
 {
     int i, nr;
     ;
@@ -48,7 +53,7 @@ int AES_set_decrypt_key(const unsigned char *userKey,
     __m128i *Temp_Key_Schedule = (__m128i *)temp_key.KEY;
     if (!userKey || !key)
         return -1;
-    if (AES_set_encrypt_key(userKey, bits, &temp_key) == -2)
+    if (AES_set_encrypt_key(userKey, bits, &temp_key,PERMUTATION_SKEY, MODIFIED_ROUND_SKEY) == -2)
         return -2;
     nr = temp_key.nr;
     key->nr = nr;
@@ -189,11 +194,7 @@ void generate_shuffled_sbox(uint8_t *sbox, uint8_t *saes_sbox, uint8_t *modified
 
     memcpy(hash_input, modified_round_skey, 8);
     SHA256(hash_input, sizeof(hash_input), hash_output);
-        for (int i=0;i<SHA256_DIGEST_LENGTH;i++)
-    {
-        printf("%02x ", hash_output[i]);
-    }
-    printf("\n");
+
     int indices[256];
 
     for (int i = 0; i < 256; i++) {
@@ -237,5 +238,46 @@ void SAES_create_saes_inverse_sbox(uint8_t *saes_sbox, uint8_t *saes_inverse_sbo
     
     for (int i = 0; i < 256; i++) {
         saes_inverse_sbox[saes_sbox[i]] = i;
+    }
+}
+
+void permute_key(uint8_t *exkey, int rounds, uint8_t *permutation_indices)
+{
+    for (int round_idx = 0; round_idx <= rounds; round_idx++)
+    {
+        int start = round_idx * 16;
+        uint8_t permuted_round_key[16];
+
+        // Apply permutation for the current round key
+        for (int i = 0; i < 16; i++)
+        {
+            permuted_round_key[i] = exkey[start + permutation_indices[round_idx * 16 + i]];
+        }
+
+        // Copy the permuted key back into exkey
+        memcpy(&exkey[start], permuted_round_key, 16);
+    }
+        //     for (int i = 0; i < 16 * (rounds + 1); i++)
+        // {
+        //     printf("%02x ", exkey[i]);
+        // }
+}
+
+void shuffle_key(uint8_t *exkey, uint8_t *shuffled_exkey, int rounds, const int *round_key_order) {
+    if (round_key_order) {
+        int idx = 0; // Track position in shuffled_exkey
+
+        // Loop over the specified order of round indices
+        for (int i = 0; i < rounds; i++) {
+            int round_idx = round_key_order[i];
+            int start = round_idx * 16;
+
+            // Copy the 16-byte round key segment to shuffled_exkey
+            memcpy(&shuffled_exkey[idx], &exkey[start], 16);
+            idx += 16;
+        }
+    } else {
+        // If round_key_order is NULL, copy exkey directly to shuffled_exkey
+        memcpy(shuffled_exkey, exkey, (rounds + 1) * 16);
     }
 }

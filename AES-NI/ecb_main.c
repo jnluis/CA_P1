@@ -121,15 +121,15 @@ int main()
         _mm_storeu_si128(&((__m128i *)PLAINTEXT)[j],
                          ((__m128i *)AES_VECTOR)[j % 4]);
     }
-    AES_set_encrypt_key(CIPHER_KEY, key_length, &key);
-    AES_set_decrypt_key(CIPHER_KEY, key_length, &decrypt_key);
-
     SAES_set_shuffle_key(SHUFFLE_KEY, key_length, &PERMUTATION_SKEY, &MODIFIED_ROUND_SKEY);
     SAES_generate_bytes_permutation_indices(permutation_indices, &PERMUTATION_SKEY);
     SAES_round_key_order_permutation(order_indices, &PERMUTATION_SKEY);
     uint8_t modified_round_number = SAES_select_modified_round_number(SHUFFLE_KEY);
     SAES_create_saes_sbox(sbox, saes_sbox, &MODIFIED_ROUND_SKEY);
     SAES_create_saes_inverse_sbox(saes_sbox, saes_inverse_sbox);
+
+    AES_set_encrypt_key(CIPHER_KEY, key_length, &key, permutation_indices, order_indices);
+    AES_set_decrypt_key(CIPHER_KEY, key_length, &decrypt_key,permutation_indices, order_indices);
 
     AES_ECB_encrypt(PLAINTEXT,
                     CIPHERTEXT,
