@@ -183,3 +183,68 @@ uint8_t SAES_select_modified_round_number(uint8_t *skey) {
     mpz_clear(round_number);
     return round_value;
 }
+
+uint8_t *SAES_create_saes_sbox(uint8_t *sbox, uint8_t *modified_round_skey) {
+
+    uint8_t shuffled_sbox[256] = generate_shuffled_sbox(sbox, modified_round_skey);
+    return validate_and_shuffle(sbox, shuffled_sbox, modified_round_skey);
+
+}
+
+uint8_t *generate_shuffled_sbox(uint8_t *sbox, uint8_t *modified_round_skey) {
+    unsigned char hash_input[8];
+    unsigned char hash_output[SHA256_DIGEST_LENGTH];
+
+    memcpy(hash_input, modified_round_skey, 8);
+    SHA256(hash_input, sizeof(hash_input), hash_output);
+
+    int indices[256];
+
+    for (int i = 0; i < 256; i++) {
+        indices[i] = i;
+    }
+
+    for (int i = 0; i < 256; i++) {
+        int swap_idx = ((uint8_t)(hash_output[i % SHA256_DIGEST_LENGTH])) % 256;
+        int temp = indices[i];
+        indices[i] = indices[swap_idx];
+        indices[swap_idx] = temp;
+    }
+
+    // Allocate memory for shuffled_sbox
+    uint8_t *shuffled_sbox = malloc(256 * sizeof(uint8_t));
+    if (!shuffled_sbox) {
+        return NULL; // Return NULL if memory allocation fails
+    }
+
+    for (int i = 0; i < 256; i++) {
+        shuffled_sbox[i] = sbox[indices[i]];
+    }
+
+    return shuffled_sbox;
+}
+
+uint8_t *validate_and_shuffle(uint8_t *sbox, uint8_t *shuffled_sbox, uint8_t *modified_round_skey) {
+    int changed_positions = 0;
+
+    for (int i = 0; i < 256; i++) {
+        if (shuffled_sbox[i] != sbox[i]) {
+            changed_positions++;
+        }
+    }
+
+    if (changed_positions < 128) {
+        free(shuffled_sbox);
+        return SAES_create_saes_sbox(sbox, modified_round_skey);
+    }
+
+    return shuffled_sbox;
+}
+
+uint8_t *SAES_create_saes_inverse_sbox(uint8_t *saes_sbox) {
+    uint8_t saes_inverse_sbox[256];
+    for (int i = 0; i < 256; i++) {
+        saes_inverse_sbox[saes_sbox[i]] = i;
+    }
+    return saes_inverse_sbox;
+}
