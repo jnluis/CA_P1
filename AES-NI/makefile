@@ -5,7 +5,7 @@ CC = gcc
 CFLAGS = -maes -msse4 -I/usr/include/openssl
 
 # Linker flags
-LDFLAGS = -lssl -lcrypto
+LDFLAGS = -lssl -lcrypto -lgmp
 
 # Source files
 ASSEMBLY_SRCS = $(wildcard *.s)

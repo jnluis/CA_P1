@@ -8,6 +8,7 @@ length specific key expansion functions
 #include <string.h>
 #include <openssl/sha.h>
 #include <stdio.h>
+#include <gmp.h>
 #if !defined(ALIGN16)
 #if defined(__GNUC__)
 #define ALIGN16 __attribute__((aligned(16)))
@@ -161,14 +162,24 @@ uint8_t SAES_select_modified_round_number(uint8_t *skey) {
 
     SHA256(hash_input, sizeof(hash_input), hash_output);
 
-    unsigned long long hash_value = 0;
-    // Combine the first few bytes of the hash into an integer
-    for (int i = 0; i < sizeof(hash_value) && i < SHA256_DIGEST_LENGTH; ++i) {
-        hash_value = (hash_value << 8) | hash_output[i];  // Shift left and add next byte
-    }
-    printf("Hash value: %lld\n", hash_value);
+    mpz_t hash_value;  // Declare a GMP integer (arbitrary precision)
+    mpz_t round_number;
+
+    mpz_init(hash_value);  // Initialize the integer
+    mpz_init(round_number);
+
+    // Convert the hexadecimal string to an integer (base 16)
+    mpz_import(hash_value, SHA256_DIGEST_LENGTH, 1, sizeof(unsigned char), 0, 0, hash_output);
+
+    // Print the resulting value
+    gmp_printf("Hash value: %Zd\n", hash_value);
 
     // Generate a round number based on the hash value
-    uint8_t round_number = (hash_value % (AES_NUMBER_OF_ROUNDS - 1)) + 1;  // Can't be on the last round
-    return round_number;
+    mpz_mod_ui(round_number, hash_value, AES_NUMBER_OF_ROUNDS - 1);
+    uint8_t round_value = mpz_get_ui(round_number) + 1;
+
+    // Clean up
+    mpz_clear(hash_value);
+    mpz_clear(round_number);
+    return round_value;
 }

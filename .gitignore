@@ -164,3 +164,4 @@ cython_debug/
 # For AES-NI
 
 *.o
+ecb_exe
