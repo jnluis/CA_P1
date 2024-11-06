@@ -91,6 +91,8 @@ int main()
     uint8_t MODIFIED_ROUND_SKEY[8];
     uint8_t permutation_indices[11][16];
     uint8_t order_indices[11];
+    uint8_t saes_inverse_sbox[256];
+    uint8_t saes_sbox[256];
 #ifdef AES128
 #define STR "Performing SAES128 ECB.\n"
     CIPHER_KEY = AES128_KEY;
@@ -126,8 +128,8 @@ int main()
     SAES_generate_bytes_permutation_indices(permutation_indices, &PERMUTATION_SKEY);
     SAES_round_key_order_permutation(order_indices, &PERMUTATION_SKEY);
     uint8_t modified_round_number = SAES_select_modified_round_number(SHUFFLE_KEY);
-    uint8_t *saes_sbox = SAES_create_saes_sbox(sbox, &MODIFIED_ROUND_SKEY);
-    uint8_t *saes_inverse_sbox = SAES_create_saes_inverse_sbox(saes_sbox);
+    SAES_create_saes_sbox(sbox, saes_sbox, &MODIFIED_ROUND_SKEY);
+    SAES_create_saes_inverse_sbox(saes_sbox, saes_inverse_sbox);
 
     AES_ECB_encrypt(PLAINTEXT,
                     CIPHERTEXT,
