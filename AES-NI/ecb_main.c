@@ -129,7 +129,7 @@ int main()
     SAES_create_saes_inverse_sbox(saes_sbox, saes_inverse_sbox);
 
     AES_set_encrypt_key(CIPHER_KEY, key_length, &key, permutation_indices, order_indices);
-    AES_set_decrypt_key(CIPHER_KEY, key_length, &decrypt_key,permutation_indices, order_indices);
+    AES_set_decrypt_key(CIPHER_KEY, key_length, &decrypt_key, permutation_indices, order_indices);
 
     AES_ECB_encrypt(PLAINTEXT,
                     CIPHERTEXT,

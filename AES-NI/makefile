@@ -2,7 +2,7 @@
 CC = gcc
 
 # Compiler flags
-CFLAGS = -maes -msse4 -I/usr/include/openssl
+CFLAGS = -maes -msse4 -Wno-error=implicit-function-declaration -I/usr/include/openssl
 
 # Linker flags
 LDFLAGS = -lssl -lcrypto -lgmp
@@ -13,7 +13,7 @@ C_SRCS = ecb_main.c aes.c
 
 # Object files
 ASSEMBLY_OBJS = $(ASSEMBLY_SRCS:.s=.o)
-C_OBJS = ecb_main.o aes.o
+C_OBJS = $(C_SRCS:.c=.o)
 
 # Executable
 TARGET = ecb_exe
