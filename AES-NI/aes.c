@@ -68,16 +68,6 @@ int AES_set_decrypt_key(const unsigned char *userKey,
     Key_Schedule[nr - 7] = _mm_aesimc_si128(Temp_Key_Schedule[7]);
     Key_Schedule[nr - 8] = _mm_aesimc_si128(Temp_Key_Schedule[8]);
     Key_Schedule[nr - 9] = _mm_aesimc_si128(Temp_Key_Schedule[9]);
-    if (nr > 10)
-    {
-        Key_Schedule[nr - 10] = _mm_aesimc_si128(Temp_Key_Schedule[10]);
-        Key_Schedule[nr - 11] = _mm_aesimc_si128(Temp_Key_Schedule[11]);
-    }
-    if (nr > 12)
-    {
-        Key_Schedule[nr - 12] = _mm_aesimc_si128(Temp_Key_Schedule[12]);
-        Key_Schedule[nr - 13] = _mm_aesimc_si128(Temp_Key_Schedule[13]);
-    }
     Key_Schedule[0] = Temp_Key_Schedule[nr];
     return 0;
 }
