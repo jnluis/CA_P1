@@ -62,12 +62,12 @@ int AES_set_decrypt_key(const unsigned char *userKey,
     int i, nr;
     ;
     AES_KEY temp_key;
-    __m128i *Key_Schedule = (__m128i *)key->KEY;
-    __m128i *Temp_Key_Schedule = (__m128i *)temp_key.KEY;
     if (!userKey || !key)
         return -1;
     if (AES_set_encrypt_key(userKey, bits, &temp_key, permutation_indices, order_indices, modified_round_number, modified_round_skey) == -2)
         return -2;
+    __m128i *Key_Schedule = (__m128i *)key->KEY;
+    __m128i *Temp_Key_Schedule = (__m128i *)temp_key.KEY;
     nr = temp_key.nr;
     key->nr = nr;
     Key_Schedule[nr] = Temp_Key_Schedule[0];

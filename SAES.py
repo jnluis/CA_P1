@@ -233,15 +233,12 @@ class AES(object):
     def add_round_key(self, block, round):
         """AddRoundKey step. This is where the key is mixed into plaintext"""
         offset = round * 16
-        exkey = self.exkey
-
-        for i in range(16):
-            block[i] ^= exkey[offset + i]
 
         if round == self.modified_round_number:
             for i in range(16):
-                block[i] ^= self.modified_round_skey[i % 8]
-
+                self.exkey[offset+i] ^= self.modified_round_skey[i % 8]
+        for i in range(16):
+            block[i] ^= self.exkey[offset + i]
 
     def sub_bytes(self, block, sbox):
         """
@@ -253,8 +250,6 @@ class AES(object):
 
         for i in range(16):
             block[i] = sbox[block[i]]
-
-        #print 'SubBytes   :', block
 
     def shift_rows(self, b):
         """
@@ -275,8 +270,6 @@ class AES(object):
         b[2], b[6], b[10], b[14] = b[10], b[14], b[2],  b[6]
         b[3], b[7], b[11], b[15] = b[15], b[3],  b[7],  b[11]
 
-        #print 'ShiftRows  :', b
-
     def shift_rows_inv(self, b):
         """
         Similar to shift_rows above, but performed in inverse for decryption.
@@ -284,8 +277,6 @@ class AES(object):
         b[5] , b[9],  b[13], b[1]  = b[1], b[5], b[9],  b[13]
         b[10], b[14], b[2],  b[6]  = b[2], b[6], b[10], b[14]
         b[15], b[3],  b[7],  b[11] = b[3], b[7], b[11], b[15]
-
-        #print 'ShiftRows  :', b
 
     def mix_columns(self, block):
         """MixColumns step. Mixes the values in each column"""
@@ -303,8 +294,6 @@ class AES(object):
             block[col + 1] = mul_by_2[v1] ^ v0 ^ v3 ^ mul_by_3[v2]
             block[col + 2] = mul_by_2[v2] ^ v1 ^ v0 ^ mul_by_3[v3]
             block[col + 3] = mul_by_2[v3] ^ v2 ^ v1 ^ mul_by_3[v0]
-
-        #print 'MixColumns :', block
 
     def mix_columns_inv(self, block):
         """
@@ -325,8 +314,6 @@ class AES(object):
             block[col + 1] = mul_14[v1] ^ mul_9[v0] ^ mul_13[v3] ^ mul_11[v2]
             block[col + 2] = mul_14[v2] ^ mul_9[v1] ^ mul_13[v0] ^ mul_11[v3]
             block[col + 3] = mul_14[v3] ^ mul_9[v2] ^ mul_13[v1] ^ mul_11[v0]
-
-        #print 'MixColumns :', block
 
     def encrypt_block(self, block):
         """Encrypts a single block. This is the main AES function"""
@@ -359,12 +346,18 @@ class AES(object):
         # count rounds down from (self.rounds) ... 1
         for round in range(self.rounds - 1, 0, -1):
             self.shift_rows_inv(block)
+
             if self.modified_round_number is None or round != self.modified_round_number - 1:
                 self.sub_bytes(block, aes_inv_sbox)
             else:
                 self.sub_bytes(block, self.saes_inv_sbox)
+
             self.add_round_key(block, round)
+            # if self.modified_round_number -1 == round:
+            #         print(block.hex())
             self.mix_columns_inv(block)
+            # if self.modified_round_number == round:
+            #     print(block.hex())
 
         self.shift_rows_inv(block)
         if self.modified_round_number is None or 0 != self.modified_round_number - 1:

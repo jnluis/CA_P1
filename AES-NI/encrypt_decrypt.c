@@ -35,8 +35,8 @@ void AES_ECB_encrypt(const unsigned char *in, // pointer to the PLAINTEXT
                 shift_rows((uint8_t *)&tmp);
                 mix_columns((uint8_t *)&tmp);
                 add_round_key((uint8_t *)&tmp, key, j);
-                // Print the block
                 print_m128i_with_string_short("Block after modified add-round", tmp, 16);
+
             }
             else{
                 tmp = _mm_aesenc_si128(tmp, ((__m128i *)key)[j]);
@@ -53,7 +53,7 @@ void AES_ECB_decrypt(const unsigned char *in, // pointer to the CIPHERTEXT
                      int number_of_rounds,
                      int modified_round_number,
                      uint8_t *modified_round_skey,
-                     uint8_t *saes_sbox)    // number of AES rounds 10,12 or 14
+                     uint8_t *saes_inverse_sbox)    // number of AES rounds 10,12 or 14
 {
     __m128i tmp;
     int i, j;
@@ -67,7 +67,20 @@ void AES_ECB_decrypt(const unsigned char *in, // pointer to the CIPHERTEXT
         tmp = _mm_xor_si128(tmp, ((__m128i *)key)[0]);
         for (j = 1; j < number_of_rounds; j++)
         {
-            tmp = _mm_aesdec_si128(tmp, ((__m128i *)key)[j]);
+             if (j == number_of_rounds- modified_round_number +1 )
+            {
+                shift_rows_inv((uint8_t *)&tmp);
+                sub_bytes((uint8_t *)&tmp, saes_inverse_sbox);
+                add_round_key((uint8_t *)&tmp, key, modified_round_number);
+                print_m128i_with_string_short("Block after modified add-round", tmp, 16);
+                mix_columns_inv((uint8_t *)&tmp);
+
+                // Print the block
+                //print_m128i_with_string_short("Block after modified add-round", tmp, 16);
+            }
+            else{
+                tmp = _mm_aesdec_si128(tmp, ((__m128i *)key)[j]);
+            }
         }
         tmp = _mm_aesdeclast_si128(tmp, ((__m128i *)key)[j]);
         _mm_storeu_si128(&((__m128i *)out)[i], tmp);
@@ -78,8 +91,9 @@ void add_round_key(uint8_t *block, uint8_t *exkey, int round) {
     int offset = round * 16;
 
     for (int i = 0; i < 16; i++) {
-        block[i] ^= exkey[offset + i];
+        block[i] ^= exkey[offset +  i];
     }
+    
 }
 
 void sub_bytes(uint8_t *block, const uint8_t *sbox) {
@@ -147,5 +161,21 @@ void mix_columns(uint8_t *block) {
         block[col + 1] = gf_mul_by_2[v1] ^ v0 ^ v3 ^ gf_mul_by_3[v2];
         block[col + 2] = gf_mul_by_2[v2] ^ v1 ^ v0 ^ gf_mul_by_3[v3];
         block[col + 3] = gf_mul_by_2[v3] ^ v2 ^ v1 ^ gf_mul_by_3[v0];
+    }
+}
+
+void mix_columns_inv(uint8_t *block) {
+    // Loop through each column (4 bytes) in the block
+    for (int col = 0; col < 16; col += 4) {
+        uint8_t v0 = block[col];
+        uint8_t v1 = block[col + 1];
+        uint8_t v2 = block[col + 2];
+        uint8_t v3 = block[col + 3];
+
+        // Apply inverse MixColumns transformation using the precomputed tables
+        block[col]     = gf_mul_by_14[v0] ^ gf_mul_by_9[v3] ^ gf_mul_by_13[v2] ^ gf_mul_by_11[v1];
+        block[col + 1] = gf_mul_by_14[v1] ^ gf_mul_by_9[v0] ^ gf_mul_by_13[v3] ^ gf_mul_by_11[v2];
+        block[col + 2] = gf_mul_by_14[v2] ^ gf_mul_by_9[v1] ^ gf_mul_by_13[v0] ^ gf_mul_by_11[v3];
+        block[col + 3] = gf_mul_by_14[v3] ^ gf_mul_by_9[v2] ^ gf_mul_by_13[v1] ^ gf_mul_by_11[v0];
     }
 }
