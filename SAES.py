@@ -228,14 +228,20 @@ class AES(object):
             self.exkey = shuffled_exkey
         else:
             self.exkey = exkey
-            
 
 
     def add_round_key(self, block, round):
         """AddRoundKey step. This is where the key is mixed into plaintext"""
-
         offset = round * 16
         exkey = self.exkey
+
+        # CÓDIGO DE TESTE PARA O C
+        exkey_temp = exkey[offset:offset + 16]
+        if round == self.modified_round_number:
+            for i in range(16):
+                exkey_temp[i] ^= self.modified_round_skey[i % 8]
+            print("Round key after modification: ", exkey_temp.tobytes().hex())
+        # CÓDIGO DE TESTE PARA O C
 
         for i in range(16):
             block[i] ^= exkey[offset + i]

@@ -27,7 +27,9 @@ int AES_set_encrypt_key(const unsigned char *userKey,
                         const int bits,
                         AES_KEY *key,
                         uint8_t *permutation_indices, 
-                        uint8_t *order_indices)
+                        uint8_t *order_indices,
+                        int modified_round_number,
+                        uint8_t *modified_round_skey)
 {
     if (!userKey || !key)
         return -1;
@@ -36,6 +38,14 @@ int AES_set_encrypt_key(const unsigned char *userKey,
         AES_128_Key_Expansion(userKey, key);
         permute_key(key, AES_128_KEY_SCHEDULES, permutation_indices);
         shuffle_key(key, AES_128_KEY_SCHEDULES, order_indices);
+
+        __m128i *modified_key = (__m128i *)key->KEY;
+        uint8_t expanded_skey[16];
+        memcpy(expanded_skey, modified_round_skey, 8);
+        memcpy(expanded_skey + 8, modified_round_skey, 8);
+        __m128i expanded_skey_m128 = *(__m128i *)expanded_skey;
+        modified_key[modified_round_number] = _mm_xor_si128(modified_key[modified_round_number], expanded_skey_m128);
+
         key->nr = 10;
         return 0;
     }
@@ -45,7 +55,9 @@ int AES_set_decrypt_key(const unsigned char *userKey,
                         const int bits,
                         AES_KEY *key,
                         uint8_t *permutation_indices,
-                        uint8_t *order_indices)
+                        uint8_t *order_indices,
+                        int modified_round_number,
+                        uint8_t *modified_round_skey)
 {
     int i, nr;
     ;
@@ -54,7 +66,7 @@ int AES_set_decrypt_key(const unsigned char *userKey,
     __m128i *Temp_Key_Schedule = (__m128i *)temp_key.KEY;
     if (!userKey || !key)
         return -1;
-    if (AES_set_encrypt_key(userKey, bits, &temp_key, permutation_indices, order_indices) == -2)
+    if (AES_set_encrypt_key(userKey, bits, &temp_key, permutation_indices, order_indices, modified_round_number, modified_round_skey) == -2)
         return -2;
     nr = temp_key.nr;
     key->nr = nr;

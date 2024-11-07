@@ -128,8 +128,8 @@ int main()
     SAES_create_saes_sbox(sbox, saes_sbox, &MODIFIED_ROUND_SKEY);
     SAES_create_saes_inverse_sbox(saes_sbox, saes_inverse_sbox);
 
-    AES_set_encrypt_key(CIPHER_KEY, key_length, &key, permutation_indices, order_indices);
-    AES_set_decrypt_key(CIPHER_KEY, key_length, &decrypt_key, permutation_indices, order_indices);
+    AES_set_encrypt_key(CIPHER_KEY, key_length, &key, permutation_indices, order_indices, modified_round_number, &MODIFIED_ROUND_SKEY);
+    AES_set_decrypt_key(CIPHER_KEY, key_length, &decrypt_key, permutation_indices, order_indices, modified_round_number, &MODIFIED_ROUND_SKEY);
 
     AES_ECB_encrypt(PLAINTEXT,
                     CIPHERTEXT,
