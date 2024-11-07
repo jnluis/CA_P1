@@ -75,6 +75,48 @@ void print_m128i_with_string_short(char *string, __m128i data, int length)
     printf("]\n");
 }
 /*****************************************************************************/
+uint8_t galois_multiply(uint8_t a, uint8_t b) {
+    uint8_t p = 0;
+    uint8_t counter = 8;
+    uint8_t hi_bit_set;
+    
+    while (counter--) {
+        if (b & 1) {
+            p ^= a;
+        }
+        
+        hi_bit_set = (a & 0x80);
+        a <<= 1;
+        
+        if (hi_bit_set) {
+            a ^= 0x1b;
+        }
+        
+        b >>= 1;
+    }
+    
+    return p;
+}
+
+uint8_t gf_mul_by_2[256];
+uint8_t gf_mul_by_3[256];
+uint8_t gf_mul_by_9[256];
+uint8_t gf_mul_by_11[256];
+uint8_t gf_mul_by_13[256];
+uint8_t gf_mul_by_14[256];
+
+// Function to initialize Galois Field multiplication tables
+void initialize_galois_tables() {
+    for (int x = 0; x < 256; x++) {
+        gf_mul_by_2[x] = galois_multiply(x, 2);
+        gf_mul_by_3[x] = galois_multiply(x, 3);
+        gf_mul_by_9[x] = galois_multiply(x, 9);
+        gf_mul_by_11[x] = galois_multiply(x, 11);
+        gf_mul_by_13[x] = galois_multiply(x, 13);
+        gf_mul_by_14[x] = galois_multiply(x, 14);
+    }
+}
+/*****************************************************************************/
 int main()
 {
     AES_KEY key;
@@ -121,6 +163,8 @@ int main()
         _mm_storeu_si128(&((__m128i *)PLAINTEXT)[j],
                          ((__m128i *)AES_VECTOR)[j % 4]);
     }
+    initialize_galois_tables();
+
     SAES_set_shuffle_key(SHUFFLE_KEY, key_length, &PERMUTATION_SKEY, &MODIFIED_ROUND_SKEY);
     SAES_generate_bytes_permutation_indices(permutation_indices, &PERMUTATION_SKEY);
     SAES_round_key_order_permutation(order_indices, &PERMUTATION_SKEY);
@@ -135,12 +179,20 @@ int main()
                     CIPHERTEXT,
                     LENGTH,
                     key.KEY,
-                    key.nr);
+                    key.nr,
+                    modified_round_number,
+                    &MODIFIED_ROUND_SKEY,
+                    saes_sbox
+                    );
     AES_ECB_decrypt(CIPHERTEXT,
                     DECRYPTEDTEXT,
                     LENGTH,
                     decrypt_key.KEY,
-                    decrypt_key.nr);
+                    decrypt_key.nr,
+                    modified_round_number,
+                    &MODIFIED_ROUND_SKEY,
+                    saes_inverse_sbox
+                    );
     printf("%s\n", STR);
     printf("The Cipher Key:\n");
     print_m128i_with_string("", ((__m128i *)CIPHER_KEY)[0]);

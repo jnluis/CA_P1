@@ -8,8 +8,8 @@ CFLAGS = -maes -msse4 -Wno-error=implicit-function-declaration -I/usr/include/op
 LDFLAGS = -lssl -lcrypto -lgmp
 
 # Source files
-ASSEMBLY_SRCS = $(wildcard *.s)
-C_SRCS = ecb_main.c aes.c
+ASSEMBLY_SRCS = key_expansion.s
+C_SRCS = ecb_main.c aes.c encrypt_decrypt.c
 
 # Object files
 ASSEMBLY_OBJS = $(ASSEMBLY_SRCS:.s=.o)
