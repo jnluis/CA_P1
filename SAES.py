@@ -346,17 +346,12 @@ class AES(object):
         # count rounds down from (self.rounds) ... 1
         for round in range(self.rounds - 1, 0, -1):
             self.shift_rows_inv(block)
-
             if self.modified_round_number is None or round != self.modified_round_number - 1:
                 self.sub_bytes(block, aes_inv_sbox)
             else:
                 self.sub_bytes(block, self.saes_inv_sbox)
             self.add_round_key(block, round)
-            if self.modified_round_number -1 == round:
-                    print(block.hex())
             self.mix_columns_inv(block)
-            if self.modified_round_number - 1 == round:
-                print("Depois da mixcolumns;", block.hex())
 
         self.shift_rows_inv(block)
         if self.modified_round_number is None or 0 != self.modified_round_number - 1:
@@ -399,7 +394,6 @@ class ECBMode(object):
     def encrypt(self, data):
         """Encrypt data in ECB mode"""
         
-        #data = data.encode()
         data = add_pkcs7_padding(data.encode())
 
         return self.ecb(data, self.cipher.encrypt_block)

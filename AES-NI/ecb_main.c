@@ -27,14 +27,6 @@ typedef struct KEY_SCHEDULE
 } AES_KEY;
 /*test vectors were taken from http://csrc.nist.gov/publications/nistpubs/800-
 38a/sp800-38a.pdf*/
-ALIGN16 uint8_t AES128_KEY[] = {0x54, 0x68, 0x61, 0x74, 0x73, 0x20, 0x6D, 0x79,
-                                     0x20, 0x4B, 0x75, 0x6E, 0x67, 0x20, 0x46, 0x75};  // "Thats my Kung Fu"                                   
-ALIGN16 uint8_t AES_VECTOR[] = {0x54, 0x77, 0x6F, 0x20, 0x4F, 0x6E, 0x65, 0x20,
-                                    0x4E, 0x69, 0x6E, 0x65, 0x20, 0x54, 0x77, 0x6F};    // "Two One Nine Two"                                 
-ALIGN16 uint8_t ECB128_EXPECTED[] = {0x29, 0xC3, 0x50, 0x5F,0x57, 0x14, 0x20, 0xF6,
-                                    0x40, 0x22, 0x99, 0xB3, 0x1A, 0x02, 0xD7, 0x3A}; 
-ALIGN16 uint8_t SAES_SHUFFLE_KEY[] = {0x4b, 0x75, 0x6e, 0x67, 0x20, 0x46, 0x75, 0x20,
-                                    0x46, 0x69, 0x67, 0x68,0x74, 0x69, 0x6e, 0x67}; // "Kung Fu Fighting"
 
 ALIGN16 uint8_t sbox[256] = {
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
@@ -117,52 +109,52 @@ void initialize_galois_tables() {
     }
 }
 /*****************************************************************************/
-int main()
+void parse_arguments(const char *arg, uint8_t *key, int len) {
+    for (int i = 0; i < len; i++) {
+        key[i] = (uint8_t)arg[i];
+    }
+}
+
+/*****************************************************************************/
+int main(int argc, char *argv[])
 {
     AES_KEY key;
     AES_KEY decrypt_key;
-    uint8_t *PLAINTEXT;
+    uint8_t PLAINTEXT[LENGTH];
     uint8_t *CIPHERTEXT;
     uint8_t *DECRYPTEDTEXT;
-    uint8_t *EXPECTED_CIPHERTEXT;
-    uint8_t *CIPHER_KEY;
+    uint8_t CIPHER_KEY[LENGTH];
     int i, j;
     int key_length;
-    uint8_t *SHUFFLE_KEY;
+    uint8_t SHUFFLE_KEY[LENGTH];
     uint8_t PERMUTATION_SKEY[8];
     uint8_t MODIFIED_ROUND_SKEY[8];
     uint8_t permutation_indices[11][16];
     uint8_t order_indices[11];
     uint8_t saes_inverse_sbox[256];
     uint8_t saes_sbox[256];
+
+    if (fread(PLAINTEXT, 1, LENGTH, stdin) <= 0) {
+        fprintf(stderr, "Error reading plaintext from stdin.\n");
+        return 1;
+    }
+
+    if (argc != 3) {
+        fprintf(stderr, "Usage: echo -n \"plaintext\" | %s <key> <skey>\n", argv[0]);
+        return 1;
+    }
+
+    parse_arguments(argv[1], CIPHER_KEY, LENGTH);
+    parse_arguments(argv[2], SHUFFLE_KEY, LENGTH);
+    
 #ifdef AES128
 #define STR "Performing SAES128 ECB.\n"
-    CIPHER_KEY = AES128_KEY;
-    EXPECTED_CIPHERTEXT = ECB128_EXPECTED;
     key_length = 128;
-    SHUFFLE_KEY = SAES_SHUFFLE_KEY;
 #endif
-    PLAINTEXT = (uint8_t *)malloc(LENGTH);
     CIPHERTEXT = (uint8_t *)malloc(LENGTH);
     DECRYPTEDTEXT = (uint8_t *)malloc(LENGTH);
-    for (i = 0; i < LENGTH / 16 / 4; i++)
-    {
-        for (j = 0; j < 4; j++)
-        {
-            _mm_storeu_si128(&((__m128i *)PLAINTEXT)[i * 4 + j],
-                             ((__m128i *)AES_VECTOR)[j]);
-        }
-    }
-    for (j = i * 4; j < LENGTH / 16; j++)
-    {
-        _mm_storeu_si128(&((__m128i *)PLAINTEXT)[j],
-                         ((__m128i *)AES_VECTOR)[j % 4]);
-    }
-    if (LENGTH % 16)
-    {
-        _mm_storeu_si128(&((__m128i *)PLAINTEXT)[j],
-                         ((__m128i *)AES_VECTOR)[j % 4]);
-    }
+
+
     initialize_galois_tables();
 
     SAES_set_shuffle_key(SHUFFLE_KEY, key_length, &PERMUTATION_SKEY, &MODIFIED_ROUND_SKEY);
@@ -221,4 +213,19 @@ int main()
         }
     }
     printf("The DECRYPTED TEXT equals to the original PLAINTEXT.\n\n");
+
+    // Output results
+    printf("PLAINTEXT:\n");
+    for (int i = 0; i < LENGTH; i++) {
+        printf("%02x", PLAINTEXT[i]);
+    }
+    printf("\nCIPHERTEXT:\n");
+    for (int i = 0; i < LENGTH; i++) {
+        printf("%02x", CIPHERTEXT[i]);
+    }
+
+    printf("\n");
+    free(CIPHERTEXT);
+    free(DECRYPTEDTEXT);
+    return 0;
 }

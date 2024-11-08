@@ -23,6 +23,7 @@ typedef struct KEY_SCHEDULE
     ALIGN16 unsigned char KEY[16 * 15];
     unsigned int nr;
 } AES_KEY;
+void AES_128_Key_Expansion(const unsigned char *userkey, AES_KEY *key);
 int AES_set_encrypt_key(const unsigned char *userKey,
                         const int bits,
                         AES_KEY *key,

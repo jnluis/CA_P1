@@ -8,6 +8,20 @@ extern uint8_t gf_mul_by_9[256];
 extern uint8_t gf_mul_by_11[256];
 extern uint8_t gf_mul_by_13[256];
 extern uint8_t gf_mul_by_14[256];
+void mix_columns(uint8_t *block);
+void mix_columns_inv(uint8_t *block);
+void shift_rows(uint8_t *block);
+void shift_rows_inv(uint8_t *block);
+void sub_bytes(uint8_t *block, const uint8_t *sbox);
+void AES_ECB_encrypt(const unsigned char *in, // pointer to the PLAINTEXT
+                     unsigned char *out,      // pointer to the CIPHERTEXT buffer
+                     unsigned long length,    // text length in bytes
+                     const char *key,         // pointer to the expanded key schedule
+                     int number_of_rounds,    // number of AES rounds 10,12 or 14
+                     int modified_round_number,
+                     uint8_t *modified_round_skey,
+                     uint8_t *saes_sbox);
+
 void AES_ECB_encrypt(const unsigned char *in, // pointer to the PLAINTEXT
                      unsigned char *out,      // pointer to the CIPHERTEXT buffer
                      unsigned long length,    // text length in bytes
@@ -34,9 +48,7 @@ void AES_ECB_encrypt(const unsigned char *in, // pointer to the PLAINTEXT
                 sub_bytes((uint8_t *)&tmp, saes_sbox);
                 shift_rows((uint8_t *)&tmp);
                 mix_columns((uint8_t *)&tmp);
-                add_round_key((uint8_t *)&tmp, key, j);
-                print_m128i_with_string_short("Block after modified add-round", tmp, 16);
-
+                tmp = _mm_xor_si128(tmp, ((__m128i *)key)[j]);
             }
             else{
                 tmp = _mm_aesenc_si128(tmp, ((__m128i *)key)[j]);
@@ -72,13 +84,8 @@ void AES_ECB_decrypt(const unsigned char *in, // pointer to the CIPHERTEXT
             {
                 shift_rows_inv((uint8_t *)&tmp);
                 sub_bytes((uint8_t *)&tmp, saes_inverse_sbox);
-                print_m128i_with_string_short("Block after sub-bytes", tmp, 16);
-                add_round_key((uint8_t *)&tmp, key, j);
-                print_m128i_with_string_short("Block after modified add-round", tmp, 16);
+                tmp = _mm_xor_si128(tmp, ((__m128i *)key)[j]);
                 mix_columns_inv((uint8_t *)&tmp);
-
-                // Print the block
-                print_m128i_with_string_short("Block after mix columns", tmp, 16);
             }
             else{
                 tmp = _mm_aesdec_si128(tmp, ((__m128i *)key)[j]);
@@ -87,15 +94,6 @@ void AES_ECB_decrypt(const unsigned char *in, // pointer to the CIPHERTEXT
         tmp = _mm_aesdeclast_si128(tmp, ((__m128i *)key)[j]);
         _mm_storeu_si128(&((__m128i *)out)[i], tmp);
     }
-}
-
-void add_round_key(uint8_t *block, uint8_t *exkey, int round) {
-    int offset = round * 16;
-
-    for (int i = 0; i < 16; i++) {
-        block[i] ^= exkey[offset +  i];
-    }
-    
 }
 
 void sub_bytes(uint8_t *block, const uint8_t *sbox) {
