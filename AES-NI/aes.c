@@ -62,12 +62,16 @@ int AES_set_decrypt_key(const unsigned char *userKey,
     int i, nr;
     ;
     AES_KEY temp_key;
+    __m128i *Key_Schedule = (__m128i *)key->KEY;
+    __m128i *Temp_Key_Schedule = (__m128i *)temp_key.KEY;
     if (!userKey || !key)
         return -1;
     if (AES_set_encrypt_key(userKey, bits, &temp_key, permutation_indices, order_indices, modified_round_number, modified_round_skey) == -2)
         return -2;
-    __m128i *Key_Schedule = (__m128i *)key->KEY;
-    __m128i *Temp_Key_Schedule = (__m128i *)temp_key.KEY;
+    // print the key schedule with assembly functions
+
+    printf("\n");
+    // ATÉ AQUI ESTÁ BEM
     nr = temp_key.nr;
     key->nr = nr;
     Key_Schedule[nr] = Temp_Key_Schedule[0];
@@ -81,6 +85,10 @@ int AES_set_decrypt_key(const unsigned char *userKey,
     Key_Schedule[nr - 8] = _mm_aesimc_si128(Temp_Key_Schedule[8]);
     Key_Schedule[nr - 9] = _mm_aesimc_si128(Temp_Key_Schedule[9]);
     Key_Schedule[0] = Temp_Key_Schedule[nr];
+    // for (int i = 0; i < 16 * 11 ; i++) {
+    //     printf("%02x", key->KEY[i]);
+    // }
+    // printf("\n");
     return 0;
 }
 
@@ -238,6 +246,10 @@ void SAES_create_saes_sbox(uint8_t *sbox, uint8_t *saes_sbox, uint8_t *modified_
 }
 
 void SAES_create_saes_inverse_sbox(uint8_t *saes_sbox, uint8_t *saes_inverse_sbox) {
+
+    for (int i = 0; i < 256; i++) {
+        saes_inverse_sbox[i] = 0;
+    }
     
     for (int i = 0; i < 256; i++) {
         saes_inverse_sbox[saes_sbox[i]] = i;

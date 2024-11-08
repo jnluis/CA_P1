@@ -53,7 +53,8 @@ void AES_ECB_decrypt(const unsigned char *in, // pointer to the CIPHERTEXT
                      int number_of_rounds,
                      int modified_round_number,
                      uint8_t *modified_round_skey,
-                     uint8_t *saes_inverse_sbox)    // number of AES rounds 10,12 or 14
+                     uint8_t *saes_inverse_sbox,
+                     const char *old_key)
 {
     __m128i tmp;
     int i, j;
@@ -71,12 +72,15 @@ void AES_ECB_decrypt(const unsigned char *in, // pointer to the CIPHERTEXT
             {
                 shift_rows_inv((uint8_t *)&tmp);
                 sub_bytes((uint8_t *)&tmp, saes_inverse_sbox);
-                add_round_key((uint8_t *)&tmp, key, modified_round_number);
+
+                __m128i *m_old_key = (__m128i *)old_key;
+                tmp = _mm_xor_si128(tmp, ((__m128i *)m_old_key)[j]); // same as AddRoundKey but with NI instructions
+                // add_round_key((uint8_t *)&tmp, old_key, j);
                 print_m128i_with_string_short("Block after modified add-round", tmp, 16);
                 mix_columns_inv((uint8_t *)&tmp);
 
                 // Print the block
-                //print_m128i_with_string_short("Block after modified add-round", tmp, 16);
+                // print_m128i_with_string_short("Block after modified add-round", tmp, 16);
             }
             else{
                 tmp = _mm_aesdec_si128(tmp, ((__m128i *)key)[j]);
@@ -128,26 +132,27 @@ void shift_rows(uint8_t *block) {
 
 void shift_rows_inv(uint8_t *block) {
     // Inverse shift for the second row (1-blockyte shift right)
-    uint8_t temp = block[13];
-    block[13] = block[9];
-    block[9] = block[5];
+    uint8_t temp = block[5];
     block[5] = block[1];
-    block[1] = temp;
+    block[1] = block[13];
+    block[13] = block[9];
+    block[9] = temp;
 
     // Inverse shift for the third row (2-blockyte shift right)
-    uint8_t temp1 = block[2];
-    uint8_t temp2 = block[6];
-    block[2] = block[10];
+    temp = block[10];
+    block[10] = block[2];
+    block[2] = temp;
+    temp = block[6];
     block[6] = block[14];
-    block[10] = temp1;
-    block[14] = temp2;
+    block[14] = temp;
 
     // Inverse shift for the fourth row (3-blockyte shift right)
-    temp = block[3];
-    block[3] = block[15];
-    block[15] = block[11];
-    block[11] = block[7];
-    block[7] = temp;
+    temp = block[15];
+    block[15] = block[3];
+    block[3] = block[7];
+    block[7] = block[11];
+    block[11] = temp;
+
 }
 
 void mix_columns(uint8_t *block) {

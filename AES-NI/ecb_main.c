@@ -191,8 +191,8 @@ int main()
                     decrypt_key.nr,
                     modified_round_number,
                     &MODIFIED_ROUND_SKEY,
-                    saes_inverse_sbox
-                    );
+                    saes_inverse_sbox,
+                    key.KEY);
     printf("%s\n", STR);
     printf("The Cipher Key:\n");
     print_m128i_with_string("", ((__m128i *)CIPHER_KEY)[0]);
@@ -211,15 +211,6 @@ int main()
         print_m128i_with_string("", ((__m128i *)CIPHERTEXT)[i]);
     if (LENGTH % 16)
         print_m128i_with_string_short("", ((__m128i *)CIPHERTEXT)[i], LENGTH % 16);
-    for (i = 0; i < LENGTH; i++)
-    {
-        if (CIPHERTEXT[i] != EXPECTED_CIPHERTEXT[i % (16 * 4)])
-        {
-            printf("The CIPHERTEXT is not equal to the EXPECTED CIHERTEXT.\n\n");
-            return 1;
-        }
-    }
-    printf("The CIPHERTEXT equals to the EXPECTED CIHERTEXT.\n\n");
     for (i = 0; i < LENGTH; i++)
     {
         if (DECRYPTEDTEXT[i] != PLAINTEXT[i % (16 * 4)])

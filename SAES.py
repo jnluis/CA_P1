@@ -351,13 +351,12 @@ class AES(object):
                 self.sub_bytes(block, aes_inv_sbox)
             else:
                 self.sub_bytes(block, self.saes_inv_sbox)
-
             self.add_round_key(block, round)
-            # if self.modified_round_number -1 == round:
-            #         print(block.hex())
+            if self.modified_round_number -1 == round:
+                    print(block.hex())
             self.mix_columns_inv(block)
-            # if self.modified_round_number == round:
-            #     print(block.hex())
+            if self.modified_round_number - 1 == round:
+                print("Depois da mixcolumns;", block.hex())
 
         self.shift_rows_inv(block)
         if self.modified_round_number is None or 0 != self.modified_round_number - 1:
