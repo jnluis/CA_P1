@@ -68,27 +68,17 @@ int AES_set_decrypt_key(const unsigned char *userKey,
         return -1;
     if (AES_set_encrypt_key(userKey, bits, &temp_key, permutation_indices, order_indices, modified_round_number, modified_round_skey) == -2)
         return -2;
-    // print the key schedule with assembly functions
-
-    printf("\n");
-    // ATÉ AQUI ESTÁ BEM
     nr = temp_key.nr;
     key->nr = nr;
     Key_Schedule[nr] = Temp_Key_Schedule[0];
-    Key_Schedule[nr - 1] = _mm_aesimc_si128(Temp_Key_Schedule[1]);
-    Key_Schedule[nr - 2] = _mm_aesimc_si128(Temp_Key_Schedule[2]);
-    Key_Schedule[nr - 3] = _mm_aesimc_si128(Temp_Key_Schedule[3]);
-    Key_Schedule[nr - 4] = _mm_aesimc_si128(Temp_Key_Schedule[4]);
-    Key_Schedule[nr - 5] = _mm_aesimc_si128(Temp_Key_Schedule[5]);
-    Key_Schedule[nr - 6] = _mm_aesimc_si128(Temp_Key_Schedule[6]);
-    Key_Schedule[nr - 7] = _mm_aesimc_si128(Temp_Key_Schedule[7]);
-    Key_Schedule[nr - 8] = _mm_aesimc_si128(Temp_Key_Schedule[8]);
-    Key_Schedule[nr - 9] = _mm_aesimc_si128(Temp_Key_Schedule[9]);
+    for (int i = 1; i < nr; i++) {
+        if (nr - modified_round_number + 1 == nr - i) {
+            Key_Schedule[nr - i] = Temp_Key_Schedule[i];
+        } else {
+            Key_Schedule[nr - i] = _mm_aesimc_si128(Temp_Key_Schedule[i]);
+        }
+    }
     Key_Schedule[0] = Temp_Key_Schedule[nr];
-    // for (int i = 0; i < 16 * 11 ; i++) {
-    //     printf("%02x", key->KEY[i]);
-    // }
-    // printf("\n");
     return 0;
 }
 

@@ -72,15 +72,13 @@ void AES_ECB_decrypt(const unsigned char *in, // pointer to the CIPHERTEXT
             {
                 shift_rows_inv((uint8_t *)&tmp);
                 sub_bytes((uint8_t *)&tmp, saes_inverse_sbox);
-
-                __m128i *m_old_key = (__m128i *)old_key;
-                tmp = _mm_xor_si128(tmp, ((__m128i *)m_old_key)[j]); // same as AddRoundKey but with NI instructions
-                // add_round_key((uint8_t *)&tmp, old_key, j);
+                print_m128i_with_string_short("Block after sub-bytes", tmp, 16);
+                add_round_key((uint8_t *)&tmp, key, j);
                 print_m128i_with_string_short("Block after modified add-round", tmp, 16);
                 mix_columns_inv((uint8_t *)&tmp);
 
                 // Print the block
-                // print_m128i_with_string_short("Block after modified add-round", tmp, 16);
+                print_m128i_with_string_short("Block after mix columns", tmp, 16);
             }
             else{
                 tmp = _mm_aesdec_si128(tmp, ((__m128i *)key)[j]);
