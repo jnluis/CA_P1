@@ -1,0 +1,8 @@
+aes_decrypt    0.021267187
+aes_encrypt    0.019012144
+Cryptography_decrypt    0.000020882
+Cryptography_encrypt    0.000018369
+NI_decrypt    0.000014666
+NI_encrypt    0.000038484
+saes_decrypt    0.022383203
+saes_encrypt    0.020028277
