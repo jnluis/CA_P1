@@ -133,14 +133,14 @@ class AES(object):
             return shuffled_sbox
 
         def validate_and_shuffle(shuffled_sbox):
+            changed_positions = 0
             # Ensure at least 50% of the S-Box bytes have changed their position
-            changed_positions = set()
             for i in range(256):
                 if shuffled_sbox[i] != aes_sbox[i]:
-                    changed_positions.add(i)
+                    changed_positions += 1
     
             # If less than 50% have changed, recursively shuffle again
-            if len(changed_positions) < 128:  # Less than half
+            if changed_positions < 128:  # Less than half
                 return self.create_saes_sbox(modified_round_skey, shuffled_sbox)  # Recurse with the same key
             return shuffled_sbox
 
