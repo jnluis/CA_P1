@@ -2,7 +2,7 @@ from array import array
 from hashlib import sha256
 from collections import Counter
 
-block_size = 16
+global block_size
 key_size = 16
 
 
@@ -53,14 +53,14 @@ class AES(object):
     
 
 
-    def generate_bytes_permutation_indices(self, skey):
+    def generate_bytes_permutation_indices(self, permutation_skey):
         """Generates a list of deterministic permutation indices for round keys."""
-        num_round_keys = self.rounds + 1  # Total rounds + final key
+        num_round_keys = self.rounds + 1  
         permutation_indices = []
 
         for round_idx in range(num_round_keys):
             # Hash the skey with the round index for deterministic bytes
-            hash_input = skey + round_idx.to_bytes(1, 'big')
+            hash_input = permutation_skey + round_idx.to_bytes(1, 'big')
             hash_output = sha256(hash_input).digest()
 
             # Use the hash output to generate a permutation for this round key
@@ -73,13 +73,13 @@ class AES(object):
 
         return permutation_indices
     
-    def round_key_order_permutation(self, skey):
-        """Generates a deterministic permutation of round key order based on SK."""
-        num_round_keys = self.rounds + 1  # Total rounds + final key
+    def round_key_order_permutation(self, permutation_skey):
+        """Generates a deterministic permutation of round key order based on permutation sub_key."""
+        num_round_keys = self.rounds + 1  
         order_indices = list(range(num_round_keys))
 
         # Generate pseudo-random bytes for shuffling
-        hash_output = sha256(skey).digest()
+        hash_output = sha256(permutation_skey).digest()
         for i in range(num_round_keys - 1, 0, -1):
             swap_idx = hash_output[i % len(hash_output)] % (i + 1)
             order_indices[i], order_indices[swap_idx] = order_indices[swap_idx], order_indices[i]
@@ -100,12 +100,15 @@ class AES(object):
         return round_number
 
     
-    def create_saes_sbox(self, modified_round_skey):
+    def create_saes_sbox(self, modified_round_skey, sbox=None):
         """
-        Creates a shuffled S-Box based on the provided secret key (skey).
-        :param skey: The secret key used for creating the S-Box.
+        Creates a shuffled S-Box based on the provided modified round sub key.
+        :param modified_round_skey: The modified sub key used for creating the S-Box.
         :return: A shuffled S-Box.
         """
+        if sbox is None:
+            sbox = aes_sbox
+
         def generate_shuffled_sbox():
             # Initial SHA-256 hash of the key
             hashed_key = sha256(modified_round_skey).digest()
@@ -129,17 +132,17 @@ class AES(object):
             shuffled_sbox = [aes_sbox[index] for index in indices]
             return shuffled_sbox
 
-        def validate_and_shuffle(sbox):
+        def validate_and_shuffle(shuffled_sbox):
             # Ensure at least 50% of the S-Box bytes have changed their position
             changed_positions = set()
             for i in range(256):
-                if sbox[i] != aes_sbox[i]:
+                if shuffled_sbox[i] != aes_sbox[i]:
                     changed_positions.add(i)
     
             # If less than 50% have changed, recursively shuffle again
             if len(changed_positions) < 128:  # Less than half
-                return self.create_saes_sbox(modified_round_skey)  # Recurse with the same key
-            return sbox
+                return self.create_saes_sbox(modified_round_skey, shuffled_sbox)  # Recurse with the same key
+            return shuffled_sbox
 
         shuffled_sbox = generate_shuffled_sbox()
         return array('B', validate_and_shuffle(shuffled_sbox))
@@ -149,9 +152,6 @@ class AES(object):
         """
         Calculate the inverse S-box from the given S-box.
         The inverse S-box maps each substituted value back to its original value.
-
-        Args:
-            sbox (array): Original S-box array
 
         Returns:
             array: Inverse S-box array
@@ -208,19 +208,16 @@ class AES(object):
             if len(exkey) >= (self.rounds + 1) * self.block_size:
                 break
         
-        
         # Shuffle round keys if `self.permutation_indices` is set
-        if self.permutation_indices:
+        if self.permutation_indices and self.round_key_order:
+            shuffled_exkey = array('B')
             for round_idx in range(self.rounds + 1):
                 start = round_idx * 16
                 end = start + 16
                 round_key = exkey[start:end]
                 permuted_round_key = array('B', [round_key[i] for i in self.permutation_indices[round_idx]])
                 exkey[start:end] = permuted_round_key
-
-        # If round key order shuffling is set, reorder the round keys
-        if self.round_key_order:
-            shuffled_exkey = array('B')
+            
             for round_idx in self.round_key_order:
                 start = round_idx * 16
                 end = start + 16
@@ -228,7 +225,6 @@ class AES(object):
             self.exkey = shuffled_exkey
         else:
             self.exkey = exkey
-
 
     def add_round_key(self, block, round):
         """AddRoundKey step. This is where the key is mixed into plaintext"""
@@ -354,7 +350,7 @@ class AES(object):
             self.mix_columns_inv(block)
 
         self.shift_rows_inv(block)
-        if self.modified_round_number is None or 0 != self.modified_round_number - 1:
+        if self.modified_round_number is None or 0 != self.modified_round_number -1:
             self.sub_bytes(block, aes_inv_sbox)
         else:
             self.sub_bytes(block, self.saes_inv_sbox)
@@ -405,9 +401,8 @@ class ECBMode(object):
         try:
             return remove_pkcs7_padding(data.decode('utf-8'))  # Attempt to decode as UTF-8
         except UnicodeDecodeError:
-            # If decoding fails, return the raw byte data or a placeholder
             print("Warning: Decrypted data is not valid UTF-8. Returning raw bytes.")
-            return data  # or you could return some error message or empty string
+            return data  
 
 def add_pkcs7_padding(plain):
     """
@@ -474,9 +469,6 @@ aes_sbox = array(
     'e1f8981169d98e949b1e87e9ce5528df'
     '8ca1890dbfe6426841992d0fb054bb16')
 )
-
-# This is the inverse of the above. In other words:
-# aes_inv_sbox[aes_sbox[val]] == val
 
 aes_inv_sbox = array(
     'B',

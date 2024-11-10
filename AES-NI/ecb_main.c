@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <wmmintrin.h>
+#include <time.h>
 #if !defined(ALIGN16)
 #if defined(__GNUC__)
 #define ALIGN16 __attribute__((aligned(16)))
@@ -120,7 +121,7 @@ int main(int argc, char *argv[])
 {
     AES_KEY key;
     AES_KEY decrypt_key;
-    uint8_t PLAINTEXT[LENGTH];
+    uint8_t *PLAINTEXT = malloc(LENGTH);
     uint8_t *CIPHERTEXT;
     uint8_t *DECRYPTEDTEXT;
     uint8_t CIPHER_KEY[LENGTH];
@@ -133,10 +134,23 @@ int main(int argc, char *argv[])
     uint8_t order_indices[11];
     uint8_t saes_inverse_sbox[256];
     uint8_t saes_sbox[256];
+    struct timespec start, end;
 
-    if (fread(PLAINTEXT, 1, LENGTH, stdin) <= 0) {
-        fprintf(stderr, "Error reading plaintext from stdin.\n");
-        return 1;
+    size_t buffer_size = LENGTH;
+    size_t length = 0;
+
+    // Dynamically read from stdin
+    int ch;
+    while ((ch = fgetc(stdin)) != EOF) {
+        if (length >= buffer_size) {
+            buffer_size *= 2;
+            PLAINTEXT = realloc(PLAINTEXT, buffer_size);
+            if (PLAINTEXT == NULL) {
+                fprintf(stderr, "Memory allocation error\n");
+                return 1;
+            }
+        }
+        PLAINTEXT[length++] = (uint8_t)ch;
     }
 
     if (argc != 3) {
@@ -151,8 +165,8 @@ int main(int argc, char *argv[])
 #define STR "Performing SAES128 ECB.\n"
     key_length = 128;
 #endif
-    CIPHERTEXT = (uint8_t *)malloc(LENGTH);
-    DECRYPTEDTEXT = (uint8_t *)malloc(LENGTH);
+    CIPHERTEXT = (uint8_t *)malloc(length);
+    DECRYPTEDTEXT = (uint8_t *)malloc(length);
 
 
     initialize_galois_tables();
@@ -167,24 +181,63 @@ int main(int argc, char *argv[])
     AES_set_encrypt_key(CIPHER_KEY, key_length, &key, permutation_indices, order_indices, modified_round_number, &MODIFIED_ROUND_SKEY);
     AES_set_decrypt_key(CIPHER_KEY, key_length, &decrypt_key, permutation_indices, order_indices, modified_round_number, &MODIFIED_ROUND_SKEY);
 
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
     AES_ECB_encrypt(PLAINTEXT,
                     CIPHERTEXT,
-                    LENGTH,
+                    length,
                     key.KEY,
                     key.nr,
                     modified_round_number,
                     &MODIFIED_ROUND_SKEY,
                     saes_sbox
                     );
+    clock_gettime(CLOCK_MONOTONIC, &end);
+
+    long seconds = end.tv_sec - start.tv_sec;
+    long nanoseconds = end.tv_nsec - start.tv_nsec;
+    double elapsed = seconds + nanoseconds * 1e-9;
+
+    FILE *file = fopen("../time/NI_encrypt_times.txt", "a");
+    if (file == NULL) {
+        perror("Failed to open file");
+        return 1;
+    }
+
+    // Write the elapsed time to the file
+    fprintf(file, "%.9f\n", elapsed);
+
+    // Close the file
+    fclose(file);
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
     AES_ECB_decrypt(CIPHERTEXT,
                     DECRYPTEDTEXT,
-                    LENGTH,
+                    length,
                     decrypt_key.KEY,
                     decrypt_key.nr,
                     modified_round_number,
                     &MODIFIED_ROUND_SKEY,
                     saes_inverse_sbox,
                     key.KEY);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+
+    seconds = end.tv_sec - start.tv_sec;
+    nanoseconds = end.tv_nsec - start.tv_nsec;
+    elapsed = seconds + nanoseconds * 1e-9;
+
+    file = fopen("../time/NI_decrypt_times.txt", "a");
+    if (file == NULL) {
+        perror("Failed to open file");
+        return 1;
+    }
+
+    // Write the elapsed time to the file
+    fprintf(file, "%.9f\n", elapsed);
+
+    // Close the file
+    fclose(file);                
     printf("%s\n", STR);
     printf("The Cipher Key:\n");
     print_m128i_with_string("", ((__m128i *)CIPHER_KEY)[0]);
@@ -225,6 +278,7 @@ int main(int argc, char *argv[])
     }
 
     printf("\n");
+    free(PLAINTEXT);
     free(CIPHERTEXT);
     free(DECRYPTEDTEXT);
     return 0;
