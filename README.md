@@ -2,6 +2,8 @@
 
 ### Academic Year: 2024/25
 
+### Grade: 15.9
+
 ## Project 1 - Shuffled AES (S-AES)
 
 The S-AES (Shuffled AES) is a modified version of AES encryption. It introduces an additional 128-bit key, the shuffle key (SK), which influences the encryption process. Like AES, S-AES follows a series of encryption rounds, but with a key difference: one of the initial 9 rounds is altered based on SK. Specifically, SK is used to pseudo-randomly select which of these rounds will be modified.
